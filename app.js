@@ -1,3 +1,6 @@
+import { auth, db, GoogleAuthProvider, signInWithPopup,
+         signOut, onAuthStateChanged, doc, getDoc, setDoc }
+  from './firebase.js';
 // ── Config ──────────────────────────────────────────────
 // Add email addresses of admin users here
 const ADMIN_EMAILS = [
@@ -65,7 +68,8 @@ window.saveNickname = function () {
   }
 
   // Sačuvaj u localStorage (zameni Firestore setDoc kad povežeš Firebase)
-  localStorage.setItem('nickname_' + currentUser.uid, nick);
+  await setDoc(doc(db, 'users', currentUser.uid),
+  { nickname }, { merge: true });
 
   hint.style.color = '#2da87a';
   hint.textContent = 'Nadimak sačuvan ✓';
@@ -123,17 +127,10 @@ function renderProfile(user) {
 // Replace this block with your Firebase Auth logic
 window.handleLogin = async function () {
   if (currentUser) {
-    // sign out
-    currentUser = null;
-    renderProfile(null);
-    renderAdmin();
+    await signOut(auth);
   } else {
-    // TODO: replace with Firebase Google sign-in
-    // import { getAuth, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
-    // const provider = new GoogleAuthProvider();
-    // const result = await signInWithPopup(auth, provider);
-    // currentUser = result.user;
-    alert('Ovde poveži Firebase Auth');
+    const provider = new GoogleAuthProvider();
+    await signInWithPopup(auth, provider);
   }
 };
 
@@ -163,4 +160,28 @@ renderLeaderboard([
   { name: 'Stefan R.', score: 2810 },
 ]);
 
-renderProfile(null);
+onAuthStateChanged(auth, async (user) => {
+  currentUser = user;
+  renderProfile(user);
+  renderAdmin();
+  if (user) {
+    // Učitaj ili kreiraj korisnički dokument
+    const ref  = doc(db, 'users', user.uid);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) {
+      await setDoc(ref, {
+        uid:         user.uid,
+        email:       user.email,
+        displayName: user.displayName,
+        createdAt:   new Date().toISOString(),
+        nickname:    '',
+        stats:       { quizzes: 0, correct: 0, points: 0 }
+      });
+    } else {
+      const data = snap.data();
+      if (data.nickname) {
+        document.getElementById('nicknameInput').value = data.nickname;
+      }
+    }
+  }
+});
