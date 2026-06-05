@@ -1,6 +1,9 @@
 import { auth, db, GoogleAuthProvider, signInWithPopup,
-         signOut, onAuthStateChanged, doc, getDoc, setDoc }
+         signOut, onAuthStateChanged, doc, getDoc, setDoc,
+         collection, getDocs, addDoc, deleteDoc, query, orderBy }
   from './firebase.js';
+
+import { initialQuestions } from './questions.js';
 
 // ── Config ───────────────────────────────────────────────
 const ADMIN_EMAILS = [
@@ -9,6 +12,7 @@ const ADMIN_EMAILS = [
 
 // ── State ────────────────────────────────────────────────
 let currentUser = null;
+let allQuestions = [];
 
 // ── Tab switching ────────────────────────────────────────
 window.switchTab = function (name, btn) {
@@ -24,6 +28,7 @@ function renderAdmin() {
   const isAdmin = currentUser && ADMIN_EMAILS.includes(currentUser.email);
   document.getElementById('admin-content').style.display = isAdmin ? 'block' : 'none';
   document.getElementById('admin-locked').style.display  = isAdmin ? 'none'  : 'block';
+  if (isAdmin) loadAdminQuestions();
 }
 
 // ── Leaderboard ──────────────────────────────────────────
@@ -31,16 +36,13 @@ function renderLeaderboard(entries) {
   const list = document.getElementById('leaderboardList');
   const rankClasses = ['gold', 'silver', 'bronze'];
   const avatarClasses = ['av-blue', 'av-teal', 'av-purple', 'av-red'];
-
   list.innerHTML = entries.map((e, i) => {
     const displayName = e.name;
     const initials = displayName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
-    const rankClass = rankClasses[i] || '';
-    const avClass = avatarClasses[i % avatarClasses.length];
     return `
       <li class="leaderboard-item">
-        <span class="rank ${rankClass}">${i + 1}</span>
-        <div class="avatar ${avClass}">${initials}</div>
+        <span class="rank ${rankClasses[i] || ''}">${i + 1}</span>
+        <div class="avatar ${avatarClasses[i % avatarClasses.length]}">${initials}</div>
         <span class="lb-name">${displayName}</span>
         <span class="lb-score">${e.score}<span class="lb-pts">pt</span></span>
       </li>`;
@@ -52,23 +54,11 @@ window.saveNickname = async function () {
   const input = document.getElementById('nicknameInput');
   const hint  = document.getElementById('nicknameHint');
   const nick  = input.value.trim();
-
-  if (!currentUser) {
-    hint.style.color = '#e85050';
-    hint.textContent = 'Mora biti prijavljen.';
-    return;
-  }
-  if (!nick) {
-    hint.style.color = '#e85050';
-    hint.textContent = 'Nadimak ne sme biti prazan.';
-    return;
-  }
-
+  if (!currentUser) { hint.style.color = '#e85050'; hint.textContent = 'Mora biti prijavljen.'; return; }
+  if (!nick)        { hint.style.color = '#e85050'; hint.textContent = 'Nadimak ne sme biti prazan.'; return; }
   await setDoc(doc(db, 'users', currentUser.uid), { nickname: nick }, { merge: true });
-
   hint.style.color = '#2da87a';
   hint.textContent = 'Nadimak sačuvan ✓';
-
   const nameEl = document.getElementById('profileName');
   if (nameEl) nameEl.textContent = nick;
 };
@@ -134,7 +124,128 @@ window.joinRoom = function () {
 // ── Admin actions ────────────────────────────────────────
 window.adminClearRooms       = () => confirm('Obriši sve sobe?')         && alert('Sobe obrisane.');
 window.adminResetLeaderboard = () => confirm('Resetuj tabelu rezultata?') && alert('Tabela resetovana.');
-window.adminAddQuestions     = () => alert('Ovde otvori modal za dodavanje pitanja.');
+
+// ── Admin: Questions ─────────────────────────────────────
+const SUBJECTS = ['Matematika', 'Srpski jezik', 'Priroda i društvo', 'Nemački jezik'];
+
+async function loadAdminQuestions() {
+  const q = query(collection(db, 'questions'), orderBy('subject'));
+  const snap = await getDocs(q);
+  allQuestions = snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }));
+  renderQuestionList();
+  updateQuestionCount();
+}
+
+function updateQuestionCount() {
+  const el = document.getElementById('adminQuestionCount');
+  if (el) el.textContent = allQuestions.length;
+}
+
+function renderQuestionList() {
+  const container = document.getElementById('adminQuestionList');
+  if (!container) return;
+
+  const filterSubject = document.getElementById('adminSubjectFilter')?.value || '';
+  const filterText    = document.getElementById('adminSearchFilter')?.value.toLowerCase() || '';
+
+  const filtered = allQuestions.filter(q => {
+    const matchSubject = !filterSubject || q.subject === filterSubject;
+    const matchText    = !filterText    || q.question.toLowerCase().includes(filterText);
+    return matchSubject && matchText;
+  });
+
+  if (filtered.length === 0) {
+    container.innerHTML = '<p style="color:#3c4060;font-size:13px;padding:12px 0;">Nema pitanja.</p>';
+    return;
+  }
+
+  container.innerHTML = filtered.map(q => `
+    <div class="admin-row" style="flex-direction:column;align-items:flex-start;gap:6px;">
+      <div style="display:flex;justify-content:space-between;width:100%;align-items:flex-start;gap:8px;">
+        <div>
+          <span class="tag tag-blue" style="margin-bottom:4px;">${q.subject}</span>
+          <p style="font-size:13px;color:#c8ccd8;margin-top:4px;line-height:1.4;">${q.question}</p>
+        </div>
+        <button class="admin-action-btn danger" onclick="deleteQuestion('${q.firestoreId}')" style="flex-shrink:0;">
+          <i class="ti ti-trash"></i>
+        </button>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;">
+        ${q.options.map((opt, i) => `
+          <span style="font-size:11px;padding:2px 8px;border-radius:4px;
+            background:${i === q.answer ? '#0f2e27' : '#13161f'};
+            color:${i === q.answer ? '#2da87a' : '#3c4060'};
+            border:0.5px solid ${i === q.answer ? '#1a4a3a' : '#1e2130'};">
+            ${String.fromCharCode(65+i)}. ${opt}
+          </span>`).join('')}
+      </div>
+    </div>`).join('');
+}
+
+window.deleteQuestion = async function (firestoreId) {
+  if (!confirm('Obriši ovo pitanje?')) return;
+  await deleteDoc(doc(db, 'questions', firestoreId));
+  allQuestions = allQuestions.filter(q => q.firestoreId !== firestoreId);
+  renderQuestionList();
+  updateQuestionCount();
+};
+
+window.adminFilterQuestions = function () {
+  renderQuestionList();
+};
+
+window.adminAddQuestions = function () {
+  const modal = document.getElementById('addQuestionModal');
+  if (modal) modal.style.display = 'flex';
+};
+
+window.closeAddQuestion = function () {
+  const modal = document.getElementById('addQuestionModal');
+  if (modal) modal.style.display = 'none';
+  document.getElementById('aqQuestion').value = '';
+  document.getElementById('aqA').value = '';
+  document.getElementById('aqB').value = '';
+  document.getElementById('aqC').value = '';
+  document.getElementById('aqD').value = '';
+  document.getElementById('aqAnswer').value = '0';
+  document.getElementById('aqSubject').value = SUBJECTS[0];
+};
+
+window.submitAddQuestion = async function () {
+  const question = document.getElementById('aqQuestion').value.trim();
+  const options  = [
+    document.getElementById('aqA').value.trim(),
+    document.getElementById('aqB').value.trim(),
+    document.getElementById('aqC').value.trim(),
+    document.getElementById('aqD').value.trim(),
+  ];
+  const answer  = parseInt(document.getElementById('aqAnswer').value);
+  const subject = document.getElementById('aqSubject').value;
+
+  if (!question || options.some(o => !o)) {
+    alert('Popuni sva polja.');
+    return;
+  }
+
+  const newQ = { subject, question, options, answer };
+  const ref = await addDoc(collection(db, 'questions'), newQ);
+  allQuestions.push({ firestoreId: ref.id, ...newQ });
+  renderQuestionList();
+  updateQuestionCount();
+  closeAddQuestion();
+};
+
+// ── Seed initial questions ────────────────────────────────
+async function seedQuestionsIfEmpty() {
+  const snap = await getDocs(collection(db, 'questions'));
+  if (!snap.empty) return;
+  const batch = initialQuestions.map(q => {
+    const { id, ...data } = q;
+    return addDoc(collection(db, 'questions'), data);
+  });
+  await Promise.all(batch);
+  console.log('Pitanja inicijalno učitana u Firestore.');
+}
 
 // ── Init ─────────────────────────────────────────────────
 renderLeaderboard([
@@ -150,26 +261,21 @@ renderAdmin();
 onAuthStateChanged(auth, async (user) => {
   currentUser = user;
   renderAdmin();
-
   if (user) {
     const ref  = doc(db, 'users', user.uid);
     const snap = await getDoc(ref);
     let nickname = '';
-
     if (!snap.exists()) {
       await setDoc(ref, {
-        uid:         user.uid,
-        email:       user.email,
-        displayName: user.displayName,
-        createdAt:   new Date().toISOString(),
-        nickname:    '',
-        stats:       { quizzes: 0, correct: 0, points: 0 }
+        uid: user.uid, email: user.email, displayName: user.displayName,
+        createdAt: new Date().toISOString(), nickname: '',
+        stats: { quizzes: 0, correct: 0, points: 0 }
       });
     } else {
       nickname = snap.data().nickname || '';
     }
-
     renderProfile(user, nickname);
+    await seedQuestionsIfEmpty();
   } else {
     renderProfile(null);
   }

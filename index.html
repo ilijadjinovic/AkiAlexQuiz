@@ -139,8 +139,25 @@
               <button class="btn-secondary" onclick="adminClearRooms()">Obriši sobe</button>
               <button class="btn-secondary" onclick="adminResetLeaderboard()">Resetuj tabelu</button>
             </div>
-            <div class="btn-row">
-              <button class="btn-primary" onclick="adminAddQuestions()">Dodaj pitanja</button>
+          </div>
+
+          <div class="admin-section">
+            <p class="admin-section-label">Pitanja <span id="adminQuestionCount" style="font-size:11px;color:#3c4060;font-weight:400;margin-left:4px;">—</span></p>
+            <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+              <select id="adminSubjectFilter" class="code-input" style="font-size:13px;letter-spacing:0;font-family:'DM Sans',sans-serif;font-weight:400;flex:1;min-width:140px;" onchange="adminFilterQuestions()">
+                <option value="">Svi predmeti</option>
+                <option>Matematika</option>
+                <option>Srpski jezik</option>
+                <option>Priroda i društvo</option>
+                <option>Nemački jezik</option>
+              </select>
+              <input id="adminSearchFilter" class="code-input" type="text" placeholder="Pretraži..." style="font-size:13px;letter-spacing:0;font-family:'DM Sans',sans-serif;font-weight:400;flex:1;min-width:120px;" oninput="adminFilterQuestions()">
+            </div>
+            <div id="adminQuestionList" style="max-height:360px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;">
+              <p style="color:#3c4060;font-size:13px;padding:8px 0;">Učitavanje...</p>
+            </div>
+            <div class="btn-row" style="margin-top:12px;">
+              <button class="btn-primary" onclick="adminAddQuestions()">+ Dodaj pitanje</button>
             </div>
           </div>
         </div>
@@ -168,7 +185,41 @@
     </nav>
   </div>
 
-  <script type="module" src="firebase.js"></script>
   <script type="module" src="app.js"></script>
+
+  <!-- Add Question Modal -->
+  <div id="addQuestionModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:100;align-items:center;justify-content:center;padding:20px;">
+    <div style="background:#13161f;border:0.5px solid #2a2d40;border-radius:16px;padding:24px;width:100%;max-width:440px;max-height:90vh;overflow-y:auto;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+        <p style="font-family:'Syne',sans-serif;font-size:17px;font-weight:700;color:#e8eaf0;">Novo pitanje</p>
+        <button onclick="closeAddQuestion()" style="background:none;border:none;color:#5a5f75;cursor:pointer;font-size:20px;line-height:1;">✕</button>
+      </div>
+      <label style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#3c4060;font-weight:500;display:block;margin-bottom:6px;">Predmet</label>
+      <select id="aqSubject" class="code-input" style="font-size:13px;letter-spacing:0;font-family:'DM Sans',sans-serif;font-weight:400;margin-bottom:14px;">
+        <option>Matematika</option>
+        <option>Srpski jezik</option>
+        <option>Priroda i društvo</option>
+        <option>Nemački jezik</option>
+      </select>
+      <label style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#3c4060;font-weight:500;display:block;margin-bottom:6px;">Pitanje</label>
+      <input id="aqQuestion" class="code-input" type="text" placeholder="Unesi pitanje..." style="font-size:13px;letter-spacing:0;font-family:'DM Sans',sans-serif;font-weight:400;margin-bottom:14px;">
+      <label style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#3c4060;font-weight:500;display:block;margin-bottom:6px;">Odgovori</label>
+      <input id="aqA" class="code-input" type="text" placeholder="A. odgovor" style="font-size:13px;letter-spacing:0;font-family:'DM Sans',sans-serif;font-weight:400;margin-bottom:8px;">
+      <input id="aqB" class="code-input" type="text" placeholder="B. odgovor" style="font-size:13px;letter-spacing:0;font-family:'DM Sans',sans-serif;font-weight:400;margin-bottom:8px;">
+      <input id="aqC" class="code-input" type="text" placeholder="C. odgovor" style="font-size:13px;letter-spacing:0;font-family:'DM Sans',sans-serif;font-weight:400;margin-bottom:8px;">
+      <input id="aqD" class="code-input" type="text" placeholder="D. odgovor" style="font-size:13px;letter-spacing:0;font-family:'DM Sans',sans-serif;font-weight:400;margin-bottom:14px;">
+      <label style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#3c4060;font-weight:500;display:block;margin-bottom:6px;">Tačan odgovor</label>
+      <select id="aqAnswer" class="code-input" style="font-size:13px;letter-spacing:0;font-family:'DM Sans',sans-serif;font-weight:400;margin-bottom:20px;">
+        <option value="0">A</option>
+        <option value="1">B</option>
+        <option value="2">C</option>
+        <option value="3">D</option>
+      </select>
+      <div class="btn-row">
+        <button class="btn-secondary" onclick="closeAddQuestion()">Otkaži</button>
+        <button class="btn-primary" onclick="submitAddQuestion()">Sačuvaj pitanje</button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
