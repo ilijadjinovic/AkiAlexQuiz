@@ -1,6 +1,5 @@
-import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut,
-         onAuthStateChanged }
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
   from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc }
   from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
@@ -14,8 +13,7 @@ const firebaseConfig = {
   appId: "1:794009330352:web:e7dddbeb0b6cdce9a81175"
 };
 
-const app      = initializeApp(firebaseConfig);
+const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db   = getFirestore(app);
-export { GoogleAuthProvider, signInWithPopup, signOut,
-         onAuthStateChanged, doc, getDoc, setDoc };
+export { GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, doc, getDoc, setDoc };

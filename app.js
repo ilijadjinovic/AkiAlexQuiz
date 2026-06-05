@@ -1,11 +1,10 @@
 import { auth, db, GoogleAuthProvider, signInWithPopup,
          signOut, onAuthStateChanged, doc, getDoc, setDoc }
   from './firebase.js';
-// ── Config ──────────────────────────────────────────────
-// Add email addresses of admin users here
+
+// ── Config ───────────────────────────────────────────────
 const ADMIN_EMAILS = [
   'ilija.djinovic@gmail.com', 'akialexdj@gmail.com'
-  // 'ilija.djinovic@gmail.com',
 ];
 
 // ── State ────────────────────────────────────────────────
@@ -17,7 +16,6 @@ window.switchTab = function (name, btn) {
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('panel-' + name).classList.add('active');
   btn.classList.add('active');
-
   if (name === 'admin') renderAdmin();
 };
 
@@ -35,7 +33,6 @@ function renderLeaderboard(entries) {
   const avatarClasses = ['av-blue', 'av-teal', 'av-purple', 'av-red'];
 
   list.innerHTML = entries.map((e, i) => {
-    // e.name treba da bude nadimak igrača (nickname iz Firestore/localStorage)
     const displayName = e.name;
     const initials = displayName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
     const rankClass = rankClasses[i] || '';
@@ -51,7 +48,7 @@ function renderLeaderboard(entries) {
 }
 
 // ── Nickname ─────────────────────────────────────────────
-window.saveNickname = function () {
+window.saveNickname = async function () {
   const input = document.getElementById('nicknameInput');
   const hint  = document.getElementById('nicknameHint');
   const nick  = input.value.trim();
@@ -67,14 +64,11 @@ window.saveNickname = function () {
     return;
   }
 
-  // Sačuvaj u localStorage (zameni Firestore setDoc kad povežeš Firebase)
-  await setDoc(doc(db, 'users', currentUser.uid),
-  { nickname }, { merge: true });
+  await setDoc(doc(db, 'users', currentUser.uid), { nickname: nick }, { merge: true });
 
   hint.style.color = '#2da87a';
   hint.textContent = 'Nadimak sačuvan ✓';
 
-  // Ažuriraj prikaz u profilu ako je prikazano ime
   const nameEl = document.getElementById('profileName');
   if (nameEl) nameEl.textContent = nick;
 };
@@ -83,31 +77,23 @@ window.onNicknameInput = function () {
   document.getElementById('nicknameHint').textContent = '';
 };
 
-function loadNickname(user) {
-  if (!user) return;
-  const saved = localStorage.getItem('nickname_' + user.uid);
-  document.getElementById('nicknameInput').value = saved || '';
-}
-
-// Helper: vrati nadimak korisnika ili fallback
-function getDisplayName(user) {
+function getDisplayName(user, firestoreNick) {
   if (!user) return 'Igrač';
-  const saved = localStorage.getItem('nickname_' + user.uid);
-  return saved || user.displayName || user.email.split('@')[0];
+  return firestoreNick || user.displayName || user.email.split('@')[0];
 }
 
 // ── Profile ──────────────────────────────────────────────
-function renderProfile(user) {
+function renderProfile(user, nickname) {
   const card = document.getElementById('profileCard');
   if (user) {
     card.style.display = 'flex';
-    const displayName = getDisplayName(user);
+    const displayName = getDisplayName(user, nickname);
     const initials = displayName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
     document.getElementById('profileAvatar').textContent = initials;
     document.getElementById('profileName').textContent   = displayName;
     document.getElementById('profileEmail').textContent  = user.email;
     document.getElementById('loginBtn').textContent      = 'Odjavi se';
-    loadNickname(user);
+    if (nickname) document.getElementById('nicknameInput').value = nickname;
   } else {
     card.style.display = 'none';
     document.getElementById('nicknameInput').value = '';
@@ -124,7 +110,6 @@ function renderProfile(user) {
 }
 
 // ── Auth ─────────────────────────────────────────────────
-// Replace this block with your Firebase Auth logic
 window.handleLogin = async function () {
   if (currentUser) {
     await signOut(auth);
@@ -147,12 +132,11 @@ window.joinRoom = function () {
 };
 
 // ── Admin actions ────────────────────────────────────────
-window.adminClearRooms       = () => confirm('Obriši sve sobe?')       && alert('Sobe obrisane.');
+window.adminClearRooms       = () => confirm('Obriši sve sobe?')         && alert('Sobe obrisane.');
 window.adminResetLeaderboard = () => confirm('Resetuj tabelu rezultata?') && alert('Tabela resetovana.');
 window.adminAddQuestions     = () => alert('Ovde otvori modal za dodavanje pitanja.');
 
 // ── Init ─────────────────────────────────────────────────
-// Demo leaderboard data — replace with Firestore fetch
 renderLeaderboard([
   { name: 'Aleksa A.', score: 4820 },
   { name: 'Milica J.', score: 3990 },
@@ -160,14 +144,18 @@ renderLeaderboard([
   { name: 'Stefan R.', score: 2810 },
 ]);
 
+renderProfile(null);
+renderAdmin();
+
 onAuthStateChanged(auth, async (user) => {
   currentUser = user;
-  renderProfile(user);
   renderAdmin();
+
   if (user) {
-    // Učitaj ili kreiraj korisnički dokument
     const ref  = doc(db, 'users', user.uid);
     const snap = await getDoc(ref);
+    let nickname = '';
+
     if (!snap.exists()) {
       await setDoc(ref, {
         uid:         user.uid,
@@ -178,10 +166,11 @@ onAuthStateChanged(auth, async (user) => {
         stats:       { quizzes: 0, correct: 0, points: 0 }
       });
     } else {
-      const data = snap.data();
-      if (data.nickname) {
-        document.getElementById('nicknameInput').value = data.nickname;
-      }
+      nickname = snap.data().nickname || '';
     }
+
+    renderProfile(user, nickname);
+  } else {
+    renderProfile(null);
   }
 });
