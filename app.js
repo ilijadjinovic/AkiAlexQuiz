@@ -249,10 +249,10 @@ async function seedQuestionsIfEmpty() {
 
 // ── Init ─────────────────────────────────────────────────
 renderLeaderboard([
-  { name: 'Aleksa A.', score: 4820 },
-  { name: 'Milica J.', score: 3990 },
-  { name: 'Nikola P.', score: 3640 },
-  { name: 'Stefan R.', score: 2810 },
+  { name: 'Test 1', score: 320 },
+  { name: 'Test 2', score: 300 },
+ // { name: 'Nikola P.', score: 3640 },
+ //{ name: 'Stefan R.', score: 2810 },
 ]);
 
 renderProfile(null);
