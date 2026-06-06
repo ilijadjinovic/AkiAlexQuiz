@@ -10,9 +10,9 @@
 </head>
 <body>
   <div class="app">
-    <header class="app-header">
+    <header class="app-header" style="justify-content:flex-start;">
+      <img src="icon-192.png" alt="logo" style="width:32px;height:32px;border-radius:8px;margin-right:6px;">
       <h1>AkiAlexQuiz</h1>
-      <span class="header-badge">Beta</span>
     </header>
 
     <main class="tab-content">
@@ -40,8 +40,7 @@
           <label>Pridruži se</label>
           <input class="code-input" type="text" placeholder="ABC1" maxlength="6" id="roomCode">
           <div class="btn-row">
-            <button class="btn-secondary">Unesi kod</button>
-            <button class="btn-primary" onclick="joinRoom()">Pridruži se →</button>
+            <button class="btn-primary" onclick="joinRoom()" style="width:100%;">Pridruži se →</button>
           </div>
         </div>
         <div id="roomInfo"></div>
