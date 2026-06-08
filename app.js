@@ -619,6 +619,18 @@ window.adminResetLeaderboard = async function () {
   alert('Tabela resetovana.');
 };
 
+window.adminReseedQuestions = async function () {
+  if (!confirm(`Ovo će obrisati sva pitanja iz baze i ponovo učitati ${initialQuestions.length} pitanja iz questions.js. Nastavi?`)) return;
+  const snap = await getDocs(collection(db, 'questions'));
+  await Promise.all(snap.docs.map(d => deleteDoc(d.ref)));
+  await Promise.all(initialQuestions.map(q => {
+    const { id, ...data } = q;
+    return addDoc(collection(db, 'questions'), data);
+  }));
+  alert(`Učitano ${initialQuestions.length} pitanja.`);
+  loadAdminQuestions();
+};
+
 async function loadAdminQuestions() {
   const [questSnap, roomsSnap, usersSnap] = await Promise.all([
     getDocs(query(collection(db, 'questions'), orderBy('subject'))),
