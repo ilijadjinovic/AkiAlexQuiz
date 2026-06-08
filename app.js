@@ -632,21 +632,28 @@ window.adminReseedQuestions = async function () {
 };
 
 async function loadAdminQuestions() {
-  const [questSnap, roomsSnap, usersSnap] = await Promise.all([
-    getDocs(query(collection(db, 'questions'), orderBy('subject'))),
-    getDocs(collection(db, 'rooms')),
-    getDocs(collection(db, 'users')),
-  ]);
+  if (!currentUser) { console.warn('loadAdminQuestions: nije ulogovan'); return; }
+  try {
+    const [questSnap, roomsSnap, usersSnap] = await Promise.all([
+      getDocs(query(collection(db, 'questions'), orderBy('subject'))),
+      getDocs(collection(db, 'rooms')),
+      getDocs(collection(db, 'users')),
+    ]);
 
-  allQuestions = questSnap.docs.map(d => ({ firestoreId: d.id, ...d.data() }));
-  renderQuestionList();
-  updateQuestionCount();
+    allQuestions = questSnap.docs.map(d => ({ firestoreId: d.id, ...d.data() }));
+    renderQuestionList();
+    updateQuestionCount();
 
-  const roomsEl = document.getElementById('adminRooms');
-  if (roomsEl) roomsEl.textContent = roomsSnap.size;
+    const roomsEl = document.getElementById('adminRooms');
+    if (roomsEl) roomsEl.textContent = roomsSnap.size;
 
-  const usersEl = document.getElementById('adminUsers');
-  if (usersEl) usersEl.textContent = usersSnap.size;
+    const usersEl = document.getElementById('adminUsers');
+    if (usersEl) usersEl.textContent = usersSnap.size;
+  } catch(e) {
+    console.error('loadAdminQuestions greška:', e);
+    const container = document.getElementById('adminQuestionList');
+    if (container) container.innerHTML = '<p style="color:#e85050;font-size:13px;padding:8px 0;">Greška pri učitavanju pitanja.</p>';
+  }
 }
 
 function updateQuestionCount() {
