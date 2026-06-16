@@ -24,6 +24,8 @@ let quizScore       = 0;
 let quizAnswered    = false;
 let countdownTimer  = null;
 let pollInterval    = null;
+let prevLobbyHash   = null;   // sprečava bljeskanje lobby-ja
+let quizStarted     = false;  // flag da sprečimo duplo startovanje
 
 // ── Tab switching ────────────────────────────────────────
 window.switchTab = function (name, btn) {
@@ -139,6 +141,8 @@ window.handleLogin = async function () {
 // ══════════════════════════════════════════════════════════
 
 function resetQuizUI() {
+  prevLobbyHash = null;
+  quizStarted   = false;
   document.getElementById('roomInfo').innerHTML    = '';
   document.getElementById('countdown').innerHTML   = '';
   document.getElementById('questionArea').innerHTML = '';
@@ -148,6 +152,11 @@ function resetQuizUI() {
 }
 
 function showLobby(roomId, code, players, amCreator) {
+  // Sprečavamo bljeskanje: ne rebuildujemo DOM ako se ništa nije promenilo
+  const lobbyHash = JSON.stringify({ code, players: players.map(p => p.uid + p.name), amCreator });
+  if (prevLobbyHash === lobbyHash) return;
+  prevLobbyHash = lobbyHash;
+
   // hide join/create cards
   document.querySelectorAll('#panel-quiz .room-card').forEach(c => c.style.display = 'none');
 
@@ -208,6 +217,9 @@ window.createRoom = async function () {
   const nick = await getMyNickname();
   const code = Math.random().toString(36).substring(2, 6).toUpperCase();
 
+  quizStarted   = false;
+  prevLobbyHash = null;
+
   const roomRef = await addDoc(collection(db, 'rooms'), {
     code,
     creatorUid: currentUser.uid,
@@ -229,6 +241,9 @@ window.joinRoom = async function () {
   if (!currentUser) { alert('Prijavite se da biste se pridružili sobi.'); return; }
   const code = document.getElementById('roomCode').value.trim().toUpperCase();
   if (!code) return;
+
+  quizStarted   = false;
+  prevLobbyHash = null;
 
   const q = query(collection(db, 'rooms'));
   const snap = await getDocs(q);
@@ -284,7 +299,9 @@ function startRoomPolling() {
 }
 
 function stopPolling() {
-  if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+  if (pollInterval)    { clearInterval(pollInterval);   pollInterval   = null; }
+  if (countdownTimer)  { clearInterval(countdownTimer); countdownTimer = null; }
+  if (questionTimer)   { clearInterval(questionTimer);  questionTimer  = null; }
 }
 
 async function pollRoom() {
@@ -297,6 +314,8 @@ async function pollRoom() {
   if (room.status === 'waiting') {
     showLobby(currentRoomId, room.code, room.players, isRoomCreator);
   } else if (room.status === 'playing') {
+    if (quizStarted) return;   // već startovano, ne ponavljamo
+    quizStarted = true;
     stopPolling();
     quizQuestions = room.questions || [];
     if (quizQuestions.length === 0) {
@@ -323,6 +342,7 @@ window.startQuiz = async function () {
   });
 
   // Kreator odmah startuje lokalno, ne čeka polling
+  quizStarted = true;  // spreči duplo pokretanje kroz pollRoom
   stopPolling();
   quizQuestions = picked;
   beginQuiz();
