@@ -46,10 +46,15 @@ function renderAdmin() {
 
 // ── Leaderboard ──────────────────────────────────────────
 async function loadLeaderboard() {
-  const q = query(collection(db, 'leaderboard'), orderBy('score', 'desc'), limit(5));
-  const snap = await getDocs(q);
-  const entries = snap.docs.map(d => d.data());
-  renderLeaderboard(entries);
+  try {
+    const q = query(collection(db, 'leaderboard'), orderBy('score', 'desc'), limit(5));
+    const snap = await getDocs(q);
+    const entries = snap.docs.map(d => d.data());
+    renderLeaderboard(entries);
+  } catch (e) {
+    // Tiha greška — najčešće nije prijavljen, prikazujemo praznu tabelu
+    console.warn('loadLeaderboard greška:', e.message);
+  }
 }
 
 function renderLeaderboard(entries) {
@@ -641,14 +646,34 @@ window.adminResetLeaderboard = async function () {
 
 window.adminReseedQuestions = async function () {
   if (!confirm(`Ovo će obrisati sva pitanja iz baze i ponovo učitati ${initialQuestions.length} pitanja iz questions.js. Nastavi?`)) return;
-  const snap = await getDocs(collection(db, 'questions'));
-  await Promise.all(snap.docs.map(d => deleteDoc(d.ref)));
-  await Promise.all(initialQuestions.map(q => {
-    const { id, ...data } = q;
-    return addDoc(collection(db, 'questions'), data);
-  }));
-  alert(`Učitano ${initialQuestions.length} pitanja.`);
-  loadAdminQuestions();
+
+  const container = document.getElementById('adminQuestionList');
+  if (container) container.innerHTML = '<p style="color:#c8983a;font-size:13px;padding:8px 0;">⏳ Brišem stara pitanja…</p>';
+
+  try {
+    const snap = await getDocs(collection(db, 'questions'));
+    await Promise.all(snap.docs.map(d => deleteDoc(d.ref)));
+
+    if (container) container.innerHTML = '<p style="color:#c8983a;font-size:13px;padding:8px 0;">⏳ Upisujem nova pitanja…</p>';
+
+    // Seed sekvencijalno u batch-evima od 20 da izbegnemo rate limit
+    const BATCH = 20;
+    for (let i = 0; i < initialQuestions.length; i += BATCH) {
+      const slice = initialQuestions.slice(i, i + BATCH);
+      await Promise.all(slice.map(q => {
+        const { id, ...data } = q;
+        return addDoc(collection(db, 'questions'), data);
+      }));
+    }
+
+    if (container) container.innerHTML = '<p style="color:#2da87a;font-size:13px;padding:8px 0;">✓ Gotovo!</p>';
+    alert(`Uspešno učitano ${initialQuestions.length} pitanja.`);
+    loadAdminQuestions();
+  } catch (e) {
+    console.error('adminReseedQuestions greška:', e);
+    if (container) container.innerHTML = '<p style="color:#e85050;font-size:13px;padding:8px 0;">Greška pri seeding-u. Pokušaj ponovo.</p>';
+    alert('Greška: ' + e.message);
+  }
 };
 
 async function loadAdminQuestions() {
@@ -767,13 +792,13 @@ async function seedQuestionsIfEmpty() {
 
 // ── Init ─────────────────────────────────────────────────
 renderLeaderboard([]);
-loadLeaderboard();
 renderProfile(null);
 renderAdmin();
 
 onAuthStateChanged(auth, async (user) => {
   currentUser = user;
   renderAdmin();
+  await loadLeaderboard(); // učitaj nakon što znamo auth status
   if (user) {
     const ref  = doc(db, 'users', user.uid);
     const snap = await getDoc(ref);
