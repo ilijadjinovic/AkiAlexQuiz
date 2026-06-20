@@ -1,4 +1,4 @@
-import { auth, db, GoogleAuthProvider, signInWithRedirect, getRedirectResult,
+import { auth, db, GoogleAuthProvider, signInWithPopup,
          signOut, onAuthStateChanged, doc, getDoc, setDoc,
          collection, getDocs, addDoc, deleteDoc, query, orderBy,
          updateDoc, serverTimestamp, limit }
@@ -137,17 +137,8 @@ function renderProfile(user, nickname) {
 
 // ── Auth ─────────────────────────────────────────────────
 window.handleLogin = async function () {
-  if (currentUser) {
-    await signOut(auth);
-  } else {
-    try {
-      await signInWithRedirect(auth, new GoogleAuthProvider());
-      // Stranica se reload-uje nakon ovoga; getRedirectResult hvata rezultat pri init-u
-    } catch (err) {
-      console.error('Login redirect error:', err);
-      alert('Prijava nije uspela. Pokušaj ponovo ili proveri internet konekciju.');
-    }
-  }
+  if (currentUser) { await signOut(auth); }
+  else { await signInWithPopup(auth, new GoogleAuthProvider()); }
 };
 
 // ══════════════════════════════════════════════════════════
@@ -803,16 +794,6 @@ async function seedQuestionsIfEmpty() {
 renderLeaderboard([]);
 renderProfile(null);
 renderAdmin();
-
-// Hvata rezultat (ili grešku) nakon povratka sa Google redirect login-a
-getRedirectResult(auth).catch((err) => {
-  console.error('Redirect login error:', err.code, err.message);
-  if (err.code === 'auth/account-exists-with-different-credential') {
-    alert('Nalog već postoji sa drugačijim načinom prijave.');
-  } else if (err.code !== 'auth/no-auth-event') {
-    alert('Google prijava je blokirana ili nije uspela: ' + (err.code || 'nepoznata greška'));
-  }
-});
 
 onAuthStateChanged(auth, async (user) => {
   currentUser = user;
