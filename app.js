@@ -1,7 +1,8 @@
-import { auth, db, GoogleAuthProvider, signInWithPopup,
+import { auth, db, secondaryAuth, GoogleAuthProvider, signInWithPopup,
          signOut, onAuthStateChanged, doc, getDoc, setDoc,
          collection, getDocs, addDoc, deleteDoc, query, orderBy,
-         updateDoc, serverTimestamp, limit }
+         updateDoc, serverTimestamp, limit,
+         createUserWithEmailAndPassword, signInWithEmailAndPassword }
   from './firebase.js';
 
 import { initialQuestions } from './questions.js';
@@ -11,6 +12,18 @@ const ADMIN_EMAILS = ['ilija.djinovic@gmail.com', 'akialexdj@gmail.com'];
 const MAX_PLAYERS  = 4;
 const QUESTIONS_PER_QUIZ = 12;
 const SUBJECTS = ['Matematika', 'Srpski jezik', 'Priroda i društvo', 'Nemački jezik'];
+const PLAYERS_DOMAIN = 'players.akialexquiz.local'; // "lažni" domen za naloge igrača (korisničko ime + lozinka)
+
+// ── Username/password helpers ───────────────────────────
+function usernameToEmail(username) {
+  return username.toLowerCase().trim() + '@' + PLAYERS_DOMAIN;
+}
+function isPlayerAccountEmail(email) {
+  return !!email && email.toLowerCase().endsWith('@' + PLAYERS_DOMAIN);
+}
+function emailToUsername(email) {
+  return isPlayerAccountEmail(email) ? email.split('@')[0] : '';
+}
 
 // ── State ────────────────────────────────────────────────
 let currentUser     = null;
@@ -26,6 +39,7 @@ let countdownTimer  = null;
 let pollInterval    = null;
 let prevLobbyHash   = null;   // sprečava bljeskanje lobby-ja
 let quizStarted     = false;  // flag da sprečimo duplo startovanje
+let allUsers        = [];     // lista korisnika (za admin panel)
 
 // ── Tab switching ────────────────────────────────────────
 window.switchTab = function (name, btn) {
@@ -111,19 +125,27 @@ function getDisplayName(user, firestoreNick) {
 // ── Profile ──────────────────────────────────────────────
 function renderProfile(user, nickname) {
   const card = document.getElementById('profileCard');
+  const playerLoginCard = document.getElementById('playerLoginCard');
   if (user) {
+    if (playerLoginCard) playerLoginCard.style.display = 'none';
     card.style.display = 'flex';
     const displayName = getDisplayName(user, nickname);
     const initials = displayName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
     document.getElementById('profileAvatar').textContent = initials;
     document.getElementById('profileName').textContent   = displayName;
-    document.getElementById('profileEmail').textContent  = user.email;
+    document.getElementById('profileEmail').textContent  = isPlayerAccountEmail(user.email)
+      ? '@' + emailToUsername(user.email)
+      : user.email;
     document.getElementById('loginBtn').textContent      = 'Odjavi se';
     if (nickname) document.getElementById('nicknameInput').value = nickname;
   } else {
+    if (playerLoginCard) playerLoginCard.style.display = '';
     card.style.display = 'none';
     document.getElementById('nicknameInput').value = '';
     document.getElementById('nicknameHint').textContent = '';
+    document.getElementById('playerUsername').value = '';
+    document.getElementById('playerPassword').value = '';
+    document.getElementById('playerLoginHint').textContent = '';
     document.getElementById('loginBtn').innerHTML = `
       <svg width="16" height="16" viewBox="0 0 18 18" fill="none">
         <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/>
@@ -139,6 +161,30 @@ function renderProfile(user, nickname) {
 window.handleLogin = async function () {
   if (currentUser) { await signOut(auth); }
   else { await signInWithPopup(auth, new GoogleAuthProvider()); }
+};
+
+window.handlePlayerLogin = async function () {
+  const hint = document.getElementById('playerLoginHint');
+  hint.style.color = '#e85050';
+  const username = document.getElementById('playerUsername').value.trim();
+  const password = document.getElementById('playerPassword').value;
+  if (!username || !password) { hint.textContent = 'Unesi korisničko ime i lozinku.'; return; }
+
+  hint.textContent = 'Prijavljivanje…';
+  hint.style.color = '#5a5f75';
+  try {
+    await signInWithEmailAndPassword(auth, usernameToEmail(username), password);
+    hint.textContent = '';
+  } catch (e) {
+    hint.style.color = '#e85050';
+    if (e.code === 'auth/invalid-credential' || e.code === 'auth/wrong-password' || e.code === 'auth/user-not-found') {
+      hint.textContent = 'Pogrešno korisničko ime ili lozinka.';
+    } else if (e.code === 'auth/too-many-requests') {
+      hint.textContent = 'Previše pokušaja. Pokušaj ponovo kasnije.';
+    } else {
+      hint.textContent = 'Greška pri prijavi: ' + e.message;
+    }
+  }
 };
 
 // ══════════════════════════════════════════════════════════
@@ -694,6 +740,9 @@ async function loadAdminQuestions() {
 
     const usersEl = document.getElementById('adminUsers');
     if (usersEl) usersEl.textContent = usersSnap.size;
+
+    allUsers = usersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderUserList();
   } catch(e) {
     console.error('loadAdminQuestions greška:', e);
     const container = document.getElementById('adminQuestionList');
@@ -753,6 +802,116 @@ window.deleteQuestion = async function (firestoreId) {
 
 window.adminFilterQuestions = function () { renderQuestionList(); };
 
+// ── Nalozi igrača (korisničko ime + lozinka) ────────────
+function renderUserList() {
+  const container = document.getElementById('adminUserList');
+  if (!container) return;
+  if (!allUsers.length) {
+    container.innerHTML = '<p style="color:#3c4060;font-size:13px;padding:8px 0;">Nema korisnika.</p>';
+    return;
+  }
+  const sorted = [...allUsers].sort((a, b) => {
+    const ap = a.isPlayerAccount ? 1 : 0, bp = b.isPlayerAccount ? 1 : 0;
+    if (ap !== bp) return ap - bp; // admini/Google nalozi prvo
+    return (a.nickname || a.displayName || '').localeCompare(b.nickname || b.displayName || '');
+  });
+  container.innerHTML = sorted.map(u => {
+    const isAdminUser = ADMIN_EMAILS.includes(u.email);
+    const label = u.nickname || u.displayName || u.username || u.email || u.id;
+    const sub = u.isPlayerAccount ? ('@' + (u.username || '')) : (u.email || '');
+    const tag = isAdminUser
+      ? '<span class="tag tag-blue">Admin</span>'
+      : (u.isPlayerAccount ? '<span class="tag tag-active">Igrač</span>' : '<span class="tag tag-blue">Google</span>');
+    const blockedTag = u.disabled ? '<span class="tag tag-danger" style="margin-left:6px;">Blokiran</span>' : '';
+    const actions = u.isPlayerAccount ? `
+      <button class="admin-action-btn" onclick="adminTogglePlayerBlock('${u.id}', ${!u.disabled})">
+        ${u.disabled ? 'Odblokiraj' : 'Blokiraj'}
+      </button>
+      <button class="admin-action-btn danger" onclick="adminDeletePlayer('${u.id}')"><i class="ti ti-trash"></i></button>
+    ` : '';
+    return `
+      <div class="admin-row" style="align-items:flex-start;">
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            <span class="admin-row-label" style="color:#c8ccd8;font-weight:500;">${label}</span>
+            ${tag}${blockedTag}
+          </div>
+          <div style="font-size:11px;color:#3c4060;margin-top:3px;">${sub}</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0;">${actions}</div>
+      </div>`;
+  }).join('');
+}
+
+window.adminCreatePlayer = async function () {
+  const hint = document.getElementById('apHint');
+  hint.style.color = '#e85050';
+
+  const displayName = document.getElementById('apDisplayName').value.trim();
+  const usernameRaw = document.getElementById('apUsername').value.trim();
+  const username     = usernameRaw.toLowerCase();
+  const password     = document.getElementById('apPassword').value;
+
+  if (!displayName) { hint.textContent = 'Unesi ime igrača.'; return; }
+  if (!/^[a-z0-9_]{3,20}$/.test(username)) {
+    hint.textContent = 'Korisničko ime: 3-20 znakova, samo mala slova, brojevi i _.';
+    return;
+  }
+  if (password.length < 6) { hint.textContent = 'Lozinka mora imati bar 6 karaktera.'; return; }
+
+  hint.style.color = '#5a5f75';
+  hint.textContent = 'Kreiranje naloga…';
+
+  try {
+    // Koristimo sekundarnu Firebase instancu da admin ne bi bio izlogovan
+    const cred = await createUserWithEmailAndPassword(secondaryAuth, usernameToEmail(username), password);
+    const newUid = cred.user.uid;
+
+    // Upisujemo profil pod admin nalogom (primarna instanca, isAdmin() pravilo)
+    await setDoc(doc(db, 'users', newUid), {
+      uid: newUid,
+      email: usernameToEmail(username),
+      username,
+      displayName,
+      nickname: displayName,
+      isPlayerAccount: true,
+      disabled: false,
+      createdBy: currentUser.uid,
+      createdAt: new Date().toISOString(),
+      stats: { quizzes: 0, correct: 0, points: 0 }
+    });
+
+    await signOut(secondaryAuth); // ne ostavljamo aktivnu sesiju na sekundarnoj instanci
+
+    hint.style.color = '#2da87a';
+    hint.textContent = `Nalog kreiran! Korisničko ime: ${username}`;
+    document.getElementById('apDisplayName').value = '';
+    document.getElementById('apUsername').value = '';
+    document.getElementById('apPassword').value = '';
+    loadAdminQuestions();
+  } catch (e) {
+    hint.style.color = '#e85050';
+    if (e.code === 'auth/email-already-in-use') {
+      hint.textContent = 'Korisničko ime je zauzeto.';
+    } else if (e.code === 'auth/weak-password') {
+      hint.textContent = 'Lozinka je preslaba (min 6 karaktera).';
+    } else {
+      hint.textContent = 'Greška: ' + e.message;
+    }
+  }
+};
+
+window.adminTogglePlayerBlock = async function (uid, disable) {
+  await updateDoc(doc(db, 'users', uid), { disabled: disable });
+  loadAdminQuestions();
+};
+
+window.adminDeletePlayer = async function (uid) {
+  if (!confirm('Obriši profil ovog igrača? (Nalog za prijavu ostaje, ali profil i statistika se brišu; preporučeno je prvo blokirati nalog.)')) return;
+  await deleteDoc(doc(db, 'users', uid));
+  loadAdminQuestions();
+};
+
 window.adminAddQuestions = function () {
   const modal = document.getElementById('addQuestionModal');
   if (modal) modal.style.display = 'flex';
@@ -810,7 +969,16 @@ onAuthStateChanged(auth, async (user) => {
         stats: { quizzes: 0, correct: 0, points: 0 }
       });
     } else {
-      nickname = snap.data().nickname || '';
+      const data = snap.data();
+      if (data.disabled) {
+        currentUser = null;
+        await signOut(auth);
+        renderProfile(null);
+        const hint = document.getElementById('playerLoginHint');
+        if (hint) { hint.style.color = '#e85050'; hint.textContent = 'Ovaj nalog je blokiran od strane administratora.'; }
+        return;
+      }
+      nickname = data.nickname || '';
     }
     renderProfile(user, nickname);
     await seedQuestionsIfEmpty();

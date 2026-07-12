@@ -83,6 +83,16 @@
           <p class="nickname-hint" id="nicknameHint"></p>
         </div>
         <div class="divider"></div>
+        <div class="room-card" id="playerLoginCard">
+          <label>Prijava igrača</label>
+          <input class="code-input" style="text-transform:none;letter-spacing:0;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:400;" type="text" id="playerUsername" placeholder="Korisničko ime" autocomplete="username">
+          <input class="code-input" style="text-transform:none;letter-spacing:0;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:400;" type="password" id="playerPassword" placeholder="Lozinka" autocomplete="current-password">
+          <div class="btn-row">
+            <button class="btn-primary" style="width:100%;" onclick="handlePlayerLogin()">Prijavi se →</button>
+          </div>
+          <p id="playerLoginHint" style="font-size:12px;color:#e85050;margin-top:8px;min-height:16px;"></p>
+        </div>
+        <div class="divider"></div>
         <button class="btn-google" id="loginBtn" onclick="handleLogin()">
           <svg width="16" height="16" viewBox="0 0 18 18" fill="none">
             <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/>
@@ -135,6 +145,19 @@
             <div class="admin-row">
               <span class="admin-row-label">Status servera</span>
               <span class="tag tag-active">Online</span>
+            </div>
+          </div>
+
+          <div class="admin-section">
+            <p class="admin-section-label">Kreiraj nalog igrača</p>
+            <div class="room-card" style="margin-bottom:0;">
+              <input id="apDisplayName" class="code-input" style="text-transform:none;letter-spacing:0;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:400;" type="text" placeholder="Ime igrača (npr. Marko)">
+              <input id="apUsername" class="code-input" style="text-transform:none;letter-spacing:0;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:400;" type="text" placeholder="Korisničko ime (npr. marko1)" autocomplete="off">
+              <input id="apPassword" class="code-input" style="text-transform:none;letter-spacing:0;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:400;margin-bottom:14px;" type="text" placeholder="Lozinka (min 6 karaktera)" autocomplete="off">
+              <div class="btn-row">
+                <button class="btn-primary" style="width:100%;" onclick="adminCreatePlayer()">+ Kreiraj igrača</button>
+              </div>
+              <p id="apHint" style="font-size:12px;color:#e85050;margin-top:8px;min-height:16px;"></p>
             </div>
           </div>
 
