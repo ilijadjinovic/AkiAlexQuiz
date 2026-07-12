@@ -1,6 +1,6 @@
 {
-  "name": "AkiAlexQuiz",
-  "short_name": "AkiQuiz",
+  "name": "AkiAlexQuiz v1.0",
+  "short_name": "AkiQuiz-Game",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#0d0f14",
