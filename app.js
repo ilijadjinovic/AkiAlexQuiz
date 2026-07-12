@@ -844,7 +844,7 @@ function renderUserList() {
       ? '<span class="tag tag-blue">Admin</span>'
       : (u.isPlayerAccount ? '<span class="tag tag-active">Igrač</span>' : '<span class="tag tag-blue">Google</span>');
     const blockedTag = u.disabled ? '<span class="tag tag-danger" style="margin-left:6px;">Banovan</span>' : '';
-    const actions = u.isPlayerAccount ? `
+    const actions = !isAdminUser ? `
       <button class="admin-action-btn" onclick="adminTogglePlayerBlock('${u.id}', ${!u.disabled})">
         ${u.disabled ? 'Skini banu' : 'Banuj'}
       </button>
@@ -984,7 +984,8 @@ onAuthStateChanged(auth, async (user) => {
         await signOut(auth);
         renderProfile(null);
         const hint = document.getElementById('playerLoginHint');
-        if (hint) { hint.style.color = '#e85050'; hint.textContent = 'Ovaj nalog je blokiran od strane administratora.'; }
+        if (hint) { hint.style.color = '#e85050'; hint.textContent = 'Ovaj nalog je banovan od strane administratora.'; }
+        alert('Ovaj nalog je banovan od strane administratora.');
         return;
       }
       nickname = data.nickname || '';
