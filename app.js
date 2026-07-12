@@ -24,6 +24,33 @@ function isPlayerAccountEmail(email) {
 function emailToUsername(email) {
   return isPlayerAccountEmail(email) ? email.split('@')[0] : '';
 }
+// Dozvoljena slova, brojevi, _ i . — ali ne na početku/kraju i ne duplo za redom
+function isValidUsername(username) {
+  if (!/^[a-z0-9_.]{3,20}$/.test(username)) return false;
+  if (username.startsWith('.') || username.endsWith('.')) return false;
+  if (username.includes('..')) return false;
+  return true;
+}
+function authErrorMessage(e) {
+  switch (e.code) {
+    case 'auth/operation-not-allowed':
+      return 'Email/Password prijava nije uključena u Firebase konzoli (Authentication → Sign-in method → Email/Password → Enable).';
+    case 'auth/email-already-in-use':
+      return 'Korisničko ime je već zauzeto.';
+    case 'auth/weak-password':
+      return 'Lozinka je preslaba (min 6 karaktera).';
+    case 'auth/invalid-email':
+      return 'Korisničko ime sadrži nedozvoljene znakove.';
+    case 'auth/invalid-credential':
+    case 'auth/wrong-password':
+    case 'auth/user-not-found':
+      return 'Pogrešno korisničko ime ili lozinka.';
+    case 'auth/too-many-requests':
+      return 'Previše pokušaja. Pokušaj ponovo kasnije.';
+    default:
+      return 'Greška: ' + e.message;
+  }
+}
 
 // ── State ────────────────────────────────────────────────
 let currentUser     = null;
@@ -177,13 +204,7 @@ window.handlePlayerLogin = async function () {
     hint.textContent = '';
   } catch (e) {
     hint.style.color = '#e85050';
-    if (e.code === 'auth/invalid-credential' || e.code === 'auth/wrong-password' || e.code === 'auth/user-not-found') {
-      hint.textContent = 'Pogrešno korisničko ime ili lozinka.';
-    } else if (e.code === 'auth/too-many-requests') {
-      hint.textContent = 'Previše pokušaja. Pokušaj ponovo kasnije.';
-    } else {
-      hint.textContent = 'Greška pri prijavi: ' + e.message;
-    }
+    hint.textContent = authErrorMessage(e);
   }
 };
 
@@ -822,12 +843,11 @@ function renderUserList() {
     const tag = isAdminUser
       ? '<span class="tag tag-blue">Admin</span>'
       : (u.isPlayerAccount ? '<span class="tag tag-active">Igrač</span>' : '<span class="tag tag-blue">Google</span>');
-    const blockedTag = u.disabled ? '<span class="tag tag-danger" style="margin-left:6px;">Blokiran</span>' : '';
+    const blockedTag = u.disabled ? '<span class="tag tag-danger" style="margin-left:6px;">Banovan</span>' : '';
     const actions = u.isPlayerAccount ? `
       <button class="admin-action-btn" onclick="adminTogglePlayerBlock('${u.id}', ${!u.disabled})">
-        ${u.disabled ? 'Odblokiraj' : 'Blokiraj'}
+        ${u.disabled ? 'Skini banu' : 'Banuj'}
       </button>
-      <button class="admin-action-btn danger" onclick="adminDeletePlayer('${u.id}')"><i class="ti ti-trash"></i></button>
     ` : '';
     return `
       <div class="admin-row" style="align-items:flex-start;">
@@ -853,8 +873,8 @@ window.adminCreatePlayer = async function () {
   const password     = document.getElementById('apPassword').value;
 
   if (!displayName) { hint.textContent = 'Unesi ime igrača.'; return; }
-  if (!/^[a-z0-9_]{3,20}$/.test(username)) {
-    hint.textContent = 'Korisničko ime: 3-20 znakova, samo mala slova, brojevi i _.';
+  if (!isValidUsername(username)) {
+    hint.textContent = 'Korisničko ime: 3-20 znakova (mala slova, brojevi, _ i .), bez tačke na početku/kraju ili duplo.';
     return;
   }
   if (password.length < 6) { hint.textContent = 'Lozinka mora imati bar 6 karaktera.'; return; }
@@ -891,24 +911,13 @@ window.adminCreatePlayer = async function () {
     loadAdminQuestions();
   } catch (e) {
     hint.style.color = '#e85050';
-    if (e.code === 'auth/email-already-in-use') {
-      hint.textContent = 'Korisničko ime je zauzeto.';
-    } else if (e.code === 'auth/weak-password') {
-      hint.textContent = 'Lozinka je preslaba (min 6 karaktera).';
-    } else {
-      hint.textContent = 'Greška: ' + e.message;
-    }
+    hint.textContent = authErrorMessage(e);
+    console.error('adminCreatePlayer greška:', e.code, e.message);
   }
 };
 
 window.adminTogglePlayerBlock = async function (uid, disable) {
   await updateDoc(doc(db, 'users', uid), { disabled: disable });
-  loadAdminQuestions();
-};
-
-window.adminDeletePlayer = async function (uid) {
-  if (!confirm('Obriši profil ovog igrača? (Nalog za prijavu ostaje, ali profil i statistika se brišu; preporučeno je prvo blokirati nalog.)')) return;
-  await deleteDoc(doc(db, 'users', uid));
   loadAdminQuestions();
 };
 
