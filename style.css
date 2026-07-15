@@ -380,6 +380,35 @@ body {
 .tag-danger { background: #2e1010; color: #e85050; border: 0.5px solid #4a1a1a; }
 .tag-blue   { background: #1a2540; color: #4e8de8; border: 0.5px solid #2a3f6e; }
 
+.admin-row-toggle {
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+.admin-row-toggle:hover { border-color: #2a2d40; background: #161922; }
+
+.admin-row-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-chevron {
+  font-size: 15px;
+  color: #3c4060;
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.admin-expand {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.25s ease;
+  margin: -4px 0 6px;
+}
+.admin-expand.open { margin: -2px 0 8px; }
+.admin-expand .admin-row { margin-bottom: 6px; }
+
 .admin-action-btn {
   background: transparent;
   border: 0.5px solid #2a2d40;

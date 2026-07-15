@@ -67,6 +67,7 @@ let pollInterval    = null;
 let prevLobbyHash   = null;   // sprečava bljeskanje lobby-ja
 let quizStarted     = false;  // flag da sprečimo duplo startovanje
 let allUsers        = [];     // lista korisnika (za admin panel)
+let allRooms        = [];     // lista aktivnih soba (za admin panel)
 
 // ── Tab switching ────────────────────────────────────────
 window.switchTab = function (name, btn) {
@@ -762,8 +763,13 @@ async function loadAdminQuestions() {
     const usersEl = document.getElementById('adminUsers');
     if (usersEl) usersEl.textContent = usersSnap.size;
 
+    allRooms = roomsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderRoomList();
+    syncOpenAdminExpand('rooms');
+
     allUsers = usersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     renderUserList();
+    syncOpenAdminExpand('users');
   } catch(e) {
     console.error('loadAdminQuestions greška:', e);
     const container = document.getElementById('adminQuestionList');
@@ -822,6 +828,62 @@ window.deleteQuestion = async function (firestoreId) {
 };
 
 window.adminFilterQuestions = function () { renderQuestionList(); };
+
+// ── Proširive kartice (Aktivne sobe / Registrovani korisnici) ──
+function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+window.toggleAdminExpand = function (type) {
+  const expand  = document.getElementById('admin' + capitalize(type) + 'Expand');
+  const chevron = document.getElementById('admin' + capitalize(type) + 'Chevron');
+  if (!expand) return;
+  const isOpen = expand.classList.contains('open');
+  if (isOpen) {
+    expand.classList.remove('open');
+    expand.style.maxHeight = '0px';
+    if (chevron) chevron.style.transform = '';
+  } else {
+    expand.classList.add('open');
+    expand.style.maxHeight = expand.scrollHeight + 'px';
+    if (chevron) chevron.style.transform = 'rotate(180deg)';
+  }
+};
+
+// Ako je kartica trenutno otvorena, ponovo izračunaj visinu nakon što se
+// lista dinamički učita/promeni (npr. posle banovanja ili nove sobe).
+function syncOpenAdminExpand(type) {
+  const expand = document.getElementById('admin' + capitalize(type) + 'Expand');
+  if (expand && expand.classList.contains('open')) {
+    expand.style.maxHeight = expand.scrollHeight + 'px';
+  }
+}
+
+// ── Sobe (za admin panel) ───────────────────────────────
+function renderRoomList() {
+  const container = document.getElementById('adminRoomsListInner');
+  if (!container) return;
+  if (!allRooms.length) {
+    container.innerHTML = '<p style="color:#3c4060;font-size:13px;padding:8px 0;">Nema aktivnih soba.</p>';
+    return;
+  }
+  const statusLabel = { waiting: 'Čeka igrače', playing: 'U toku', finished: 'Završeno' };
+  const statusTag   = { waiting: 'tag-warn', playing: 'tag-active', finished: 'tag-blue' };
+  container.innerHTML = allRooms.map(r => {
+    const players   = r.players || [];
+    const names     = players.map(p => p.name).join(', ') || '—';
+    const tagClass  = statusTag[r.status] || 'tag-blue';
+    const label     = statusLabel[r.status] || r.status || '—';
+    return `
+      <div class="admin-row" style="align-items:flex-start;">
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            <span class="admin-row-label" style="color:#c8ccd8;font-weight:700;font-family:'Syne',sans-serif;letter-spacing:1px;">${r.code || r.id}</span>
+            <span class="tag ${tagClass}">${label}</span>
+          </div>
+          <div style="font-size:11px;color:#3c4060;margin-top:3px;">${players.length}/${MAX_PLAYERS} igrača: ${names}</div>
+        </div>
+      </div>`;
+  }).join('');
+}
 
 // ── Nalozi igrača (korisničko ime + lozinka) ────────────
 function renderUserList() {

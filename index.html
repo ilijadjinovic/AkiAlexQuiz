@@ -136,14 +136,33 @@
         <div id="admin-content">
           <div class="admin-section">
             <p class="admin-section-label">Pregled sistema</p>
-            <div class="admin-row">
+
+            <div class="admin-row admin-row-toggle" onclick="toggleAdminExpand('rooms')" id="adminRoomsRow">
               <span class="admin-row-label">Aktivne sobe</span>
-              <span class="admin-row-value" id="adminRooms">—</span>
+              <div class="admin-row-right">
+                <span class="admin-row-value" id="adminRooms">—</span>
+                <i class="ti ti-chevron-down admin-chevron" id="adminRoomsChevron"></i>
+              </div>
             </div>
-            <div class="admin-row">
+            <div class="admin-expand" id="adminRoomsExpand">
+              <div id="adminRoomsListInner">
+                <!-- Populate dynamically via app.js -->
+              </div>
+            </div>
+
+            <div class="admin-row admin-row-toggle" onclick="toggleAdminExpand('users')" id="adminUsersRow">
               <span class="admin-row-label">Registrovani korisnici</span>
-              <span class="admin-row-value" id="adminUsers">—</span>
+              <div class="admin-row-right">
+                <span class="admin-row-value" id="adminUsers">—</span>
+                <i class="ti ti-chevron-down admin-chevron" id="adminUsersChevron"></i>
+              </div>
             </div>
+            <div class="admin-expand" id="adminUsersExpand">
+              <div id="adminUserList">
+                <!-- Populate dynamically via app.js -->
+              </div>
+            </div>
+
             <div class="admin-row">
               <span class="admin-row-label">Status servera</span>
               <span class="tag tag-active">Online</span>
@@ -160,13 +179,6 @@
                 <button class="btn-primary" style="width:100%;" onclick="adminCreatePlayer()">+ Kreiraj igrača</button>
               </div>
               <p id="apHint" style="font-size:12px;color:#e85050;margin-top:8px;min-height:16px;"></p>
-            </div>
-          </div>
-
-          <div class="admin-section">
-            <p class="admin-section-label">Korisnici</p>
-            <div id="adminUserList">
-              <!-- Populate dynamically via app.js -->
             </div>
           </div>
 
