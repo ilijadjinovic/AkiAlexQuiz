@@ -865,15 +865,22 @@ function renderRoomList() {
     container.innerHTML = '<p style="color:#3c4060;font-size:13px;padding:8px 0;">Nema aktivnih soba.</p>';
     return;
   }
+
   const statusLabel = { waiting: 'Čeka igrače', playing: 'U toku', finished: 'Završeno' };
   const statusTag   = { waiting: 'tag-warn', playing: 'tag-active', finished: 'tag-blue' };
-  container.innerHTML = allRooms.map(r => {
-    const players   = r.players || [];
-    const names     = players.map(p => p.name).join(', ') || '—';
-    const tagClass  = statusTag[r.status] || 'tag-blue';
-    const label     = statusLabel[r.status] || r.status || '—';
+
+  const isActive = r => (r.status === 'waiting' || r.status === 'playing') && (r.players || []).length > 0;
+
+  const activeRooms = allRooms.filter(isActive);
+  const closedRooms = allRooms.filter(r => !isActive(r));
+
+  const renderRoom = (r, dimmed) => {
+    const players  = r.players || [];
+    const names    = players.map(p => p.name).join(', ') || '—';
+    const tagClass = statusTag[r.status] || 'tag-blue';
+    const label    = statusLabel[r.status] || r.status || '—';
     return `
-      <div class="admin-row" style="align-items:flex-start;">
+      <div class="admin-row" style="align-items:flex-start;${dimmed ? 'opacity:0.55;' : ''}">
         <div style="flex:1;min-width:0;">
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
             <span class="admin-row-label" style="color:#c8ccd8;font-weight:700;font-family:'Syne',sans-serif;letter-spacing:1px;">${r.code || r.id}</span>
@@ -882,7 +889,26 @@ function renderRoomList() {
           <div style="font-size:11px;color:#3c4060;margin-top:3px;">${players.length}/${MAX_PLAYERS} igrača: ${names}</div>
         </div>
       </div>`;
-  }).join('');
+  };
+
+  let html = '';
+
+  if (activeRooms.length) {
+    html += activeRooms.map(r => renderRoom(r, false)).join('');
+  } else {
+    html += '<p style="color:#3c4060;font-size:13px;padding:4px 0 10px;">Trenutno nema aktivnih soba.</p>';
+  }
+
+  if (closedRooms.length) {
+    html += `
+      <div style="display:flex;align-items:center;gap:8px;margin:10px 0 8px;">
+        <span style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#2a2d40;font-weight:500;white-space:nowrap;">Istorija · zatvorene sobe</span>
+        <span style="flex:1;height:0.5px;background:#1e2130;"></span>
+      </div>`;
+    html += closedRooms.map(r => renderRoom(r, true)).join('');
+  }
+
+  container.innerHTML = html;
 }
 
 // ── Nalozi igrača (korisničko ime + lozinka) ────────────
